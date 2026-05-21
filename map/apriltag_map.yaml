@@ -1,0 +1,13 @@
+tags:
+  - id: 0
+    position: [1.235, 0.0, 1.305]                 # x, y, z in meters
+    orientation_rpy: [-1.5708, 0.0, -1.5708]      # roll, pitch, yaw in radians
+  - id: 1
+    position: [0.0, -3.84, 1.305]
+    orientation_rpy: [-1.5708, 0.0, 3.1416]
+  - id: 2
+    position: [1.235, -2.11, 1.305]
+    orientation_rpy: [-1.5708, 0.0, -1.5708]
+  - id: 3
+    position: [1.130, -3.84, 1.305]
+    orientation_rpy: [-1.5708, 0.0, 3.1416]
