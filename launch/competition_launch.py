@@ -5,7 +5,7 @@ import os
 
 
 def generate_launch_description():
-     package_name = 'tello_localization'
+     package_name = 'competition'
      rviz_config = os.path.join(get_package_share_directory(package_name), 'rviz', 'config.rviz')
 
      # ====================================================
