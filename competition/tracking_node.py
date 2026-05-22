@@ -13,12 +13,11 @@ class BalloonTrackingNode(Node):
         self.target_pub = self.create_publisher(PoseStamped, '/balloon/target_pose', 10)
         self.marker_pub = self.create_publisher(MarkerArray, '/balloon/markers', 10)
         
-        # 預測前瞻時間參數 (秒)
+        # predict time horizon
         self.declare_parameter('lookahead_time', 0.8) # 可根據 Tello 的反應速度動態調整
         self.dt_pred = self.get_parameter('lookahead_time').value
 
-        # 初始化卡爾曼濾波器狀態與矩陣
-        # 狀態向量 x = [x, y, z, vx, vy, vz]^T
+        # balloon state = [x, y, z, vx, vy, vz]^T
         self.x = np.zeros((6, 1))
         self.P = np.eye(6) * 1.0  # 初始不確定度大一點
         
@@ -30,17 +29,35 @@ class BalloonTrackingNode(Node):
 
         self.is_initialized = False
         self.last_time = None
+
+        # Preventing Ghosting
+        self.last_measurement_time = self.get_clock().now()
+        self.timeout_duration = 1.5                                        # Time horizon of disappear (s)
+        self.check_timer = self.create_timer(0.1, self.check_timeout_loop) # 10Hz for check
+
         self.get_logger().info("Balloon Tracking Node (KF 速度預測) 已啟動！")
 
+    def check_timeout_loop(self):
+        if not self.is_initialized:
+            return
+            
+        current_time = self.get_clock().now()
+        dt = (current_time - self.last_measurement_time).nanoseconds / 1e9
+        if dt > self.timeout_duration:
+            self.get_logger().warn(f"氣球丟失！超過 {self.timeout_duration} 秒未偵測到，停止預測與追蹤...")
+            self.is_initialized = False # 重置 KF 狀態
+            self.clear_rviz_markers()
+
     def balloon_cb(self, msg):
+        self.last_measurement_time = self.get_clock().now()
         current_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         
-        # 1. 第一次收到訊號，初始化狀態向量
+        # initial first balloon positiion
         if not self.is_initialized:
             self.x[0, 0] = msg.pose.position.x
             self.x[1, 0] = msg.pose.position.y
             self.x[2, 0] = msg.pose.position.z
-            self.x[3:, 0] = 0.0 # 初始速度設為 0
+            self.x[3:, 0] = 0.0                  # initial velocity setting -> 0
             self.last_time = current_time
             self.is_initialized = True
             return
@@ -49,12 +66,12 @@ class BalloonTrackingNode(Node):
         if dt <= 0: return
         self.last_time = current_time
 
-        # 2. 觀測值 z = [x, y, z]^T
+        # z = [x, y, z]^T
         z = np.array([[msg.pose.position.x],
                       [msg.pose.position.y],
                       [msg.pose.position.z]])
 
-        # 3. 卡爾曼濾波：Predict 步 (等速模型)
+        # Predict (等速模型)
         F = np.eye(6)
         F[0, 3] = dt
         F[1, 4] = dt
@@ -63,25 +80,25 @@ class BalloonTrackingNode(Node):
         self.x = F @ self.x
         self.P = F @ self.P @ F.T + self.Q
 
-        # 4. 卡爾曼濾波：Update 步
+        # Update
         H = np.zeros((3, 6))
         H[0, 0] = 1.0
         H[1, 1] = 1.0
         H[2, 2] = 1.0
 
-        y = z - H @ self.x # 殘差
+        y = z - H @ self.x
         S = H @ self.P @ H.T + self.R
-        K = self.P @ H.T @ np.linalg.inv(S) # 卡爾曼增益
+        K = self.P @ H.T @ np.linalg.inv(S)
 
         self.x = self.x + K @ y
         self.P = (np.eye(6) - K @ H) @ self.P
 
-        # 5. 計算 t + dt_pred 時刻的預測位置 (前瞻攔截點)
+        # calculate t + dt_pred timestep position
         pred_x = self.x[0, 0] + self.x[3, 0] * self.dt_pred
         pred_y = self.x[1, 0] + self.x[4, 0] * self.dt_pred
         pred_z = self.x[2, 0] + self.x[5, 0] * self.dt_pred
 
-        # 6. 發布預測目標給 control_node
+        # publish predict balloon position
         target_msg = PoseStamped()
         target_msg.header = msg.header
         target_msg.pose.position.x = float(pred_x)
@@ -90,8 +107,15 @@ class BalloonTrackingNode(Node):
         target_msg.pose.orientation.w = 1.0
         self.target_pub.publish(target_msg)
 
-        # 7. 發布 RViz2 視覺化 Markers
+        # visualization
         self.publish_rviz_markers(msg.header, pred_x, pred_y, pred_z)
+
+    def clear_rviz_markers(self):
+        marker_array = MarkerArray()
+        m_delete = Marker()
+        m_delete.action = Marker.DELETEALL
+        marker_array.markers.append(m_delete)
+        self.marker_pub.publish(marker_array)
 
     def publish_rviz_markers(self, header, px, py, pz):
         marker_array = MarkerArray()

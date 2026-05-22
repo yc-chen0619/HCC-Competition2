@@ -24,6 +24,10 @@ class ControlTelloEKF(Node):
         self.target_y = None
         self.target_z = None
 
+        #超過 0.5 秒沒收到 target_pose 就強制懸停
+        self.last_target_time = None
+        self.target_timeout = 0.5   #秒
+
         # 控制模式：False 為手動鍵盤，True 為自動追蹤氣球
         self.auto_mode = False
 
@@ -32,6 +36,7 @@ class ControlTelloEKF(Node):
         self.KP_Z = 0.8     # 高度控制增益
         self.KP_YAW = 1.0   # 轉向對準氣球增益
         self.MAX_VEL = 0.5  # 限制自動模式最大速度 (公尺/秒)，安全第一
+        self.MAX_YAW_RATE = 0.8 # 限制最大旋轉角速度 (rad/s)，避免自旋失控
 
         pygame.init()
         self.screen = pygame.display.set_mode((480, 460))
@@ -69,6 +74,7 @@ class ControlTelloEKF(Node):
         self.target_x = msg.pose.position.x
         self.target_y = msg.pose.position.y
         self.target_z = msg.pose.position.z
+        self.last_target_time = self.get_clock().now()
 
     def send_tello_cmd(self, cmd_string):
         if not self.client_.service_is_ready():
@@ -143,8 +149,15 @@ class ControlTelloEKF(Node):
         # 自動模式核心控制邏輯 (核心運算)
         # ====================================================
         if self.auto_mode:
-            # 確保有收到雙方的定位資料，否則先懸停原地等待
-            if (self.drone_x is not None) and (self.target_x is not None):
+            # 檢查 target 是否過期 (搭配 tracking_node 的丟失不發布機制)
+            is_target_valid = False
+            if self.last_target_time is not None:
+                dt = (self.get_clock().now() - self.last_target_time).nanoseconds / 1e9
+                if dt <= self.target_timeout:
+                    is_target_valid = True
+
+            # 確保有無人機定位，且氣球目標有效且沒過期
+            if (self.drone_x is not None) and is_target_valid:
                 # 1. 計算在世界座標系(Map Frame)下的誤差
                 dx_map = self.target_x - self.drone_x
                 dy_map = self.target_y - self.drone_y
@@ -166,7 +179,8 @@ class ControlTelloEKF(Node):
                 dyaw = target_yaw - self.drone_yaw
                 # 將角度誤差標準化至 [-pi, pi] 區間，防止盲目亂轉旋轉
                 dyaw = math.atan2(math.sin(dyaw), math.cos(dyaw))
-                self.yaw_rate = self.KP_YAW * dyaw
+                raw_yaw_rate = self.KP_YAW * dyaw
+                self.yaw_rate = max(min(raw_yaw_rate, self.MAX_YAW_RATE), -self.MAX_YAW_RATE)
 
                 # 5. 安全限速保護
                 self.v_x = max(min(self.v_x, self.MAX_VEL), -self.MAX_VEL)

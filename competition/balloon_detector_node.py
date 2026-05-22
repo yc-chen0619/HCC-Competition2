@@ -18,8 +18,8 @@ def CameraIntrinsics():
     FY = 906.73
     CX = 470.05
     CY = 369.95
-    TagSize = 0.20                   # m
-    return FX, FY, CX, CY, TagSize
+    BalloonSize = 0.20                   # m
+    return FX, FY, CX, CY, BalloonSize
 
 class BalloonDetectorNode(Node):
     def __init__(self):
@@ -34,9 +34,10 @@ class BalloonDetectorNode(Node):
         self.FY = camera_intrinsic[1]
         self.CX = camera_intrinsic[2]
         self.CY = camera_intrinsic[3]
-        self.F_AVG = (self.FX + self.FY) / 2.0 # 平均焦距
+        balloon_size = camera_intrinsic[4]
+        self.F_AVG = (self.FX + self.FY) / 2.0
         
-        self.declare_parameter('balloon_diameter', 0.25)
+        self.declare_parameter('balloon_diameter', balloon_size)
         self.BALLOON_D = self.get_parameter('balloon_diameter').value
 
         # 建立 TF2 監聽器
@@ -67,16 +68,13 @@ class BalloonDetectorNode(Node):
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
-        # 2. 尋找輪廓
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
         if len(contours) == 0:
             return # 沒看到紅球則跳過
 
         # 找到面積最大的輪廓
         max_contour = max(contours, key=cv2.contourArea)
         area = cv2.contourArea(max_contour)
-
         if area < 150: # 面積太小視為雜訊
             return
 
