@@ -14,7 +14,7 @@ class TagTFBroadcaster(Node):
         super().__init__('tag_tf_broadcaster')
         self.broadcaster = StaticTransformBroadcaster(self)
         
-        package_share = get_package_share_directory('tello_localization')
+        package_share = get_package_share_directory('competition')
         yaml_path = os.path.join(package_share, 'map', 'apriltag_map.yaml')
         with open(yaml_path, 'r') as f:
             data = yaml.safe_load(f)
