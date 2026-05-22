@@ -52,7 +52,7 @@ class AprilTagDetectorNode(Node):
         self.tag_size = camera_intrinsic[4]
         self.camera_params = [self.fx, self.fy, self.cx, self.cy]
 
-        package_share = get_package_share_directory('tello_localization')
+        package_share = get_package_share_directory('competition')
         yaml_path = os.path.join(package_share, 'map', 'apriltag_map.yaml')
         try:
             with open(yaml_path, 'r') as f:
