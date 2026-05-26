@@ -20,11 +20,11 @@ from scipy.spatial.transform import Rotation as R
 
 
 def CameraIntrinsics():
-    FX = 907.45
-    FY = 906.73
-    CX = 470.05
-    CY = 369.95
-    TagSize = 0.20 # m
+    FX = 956.0621110493081
+    FY = 921.110508356438
+    CX = 471.4821215939283
+    CY = 380.2998652355449 
+    TagSize = 0.165 # m
     return FX, FY, CX, CY, TagSize
 
 

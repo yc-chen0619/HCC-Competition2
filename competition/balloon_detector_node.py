@@ -14,11 +14,11 @@ import tf2_ros
 import tf2_geometry_msgs 
 
 def CameraIntrinsics():
-    FX = 907.45
-    FY = 906.73
-    CX = 470.05
-    CY = 369.95
-    BalloonSize = 0.20                   # m
+    FX = 956.0621110493081
+    FY = 921.110508356438
+    CX = 471.4821215939283
+    CY = 380.2998652355449 
+    BalloonSize = 0.40                   # m
     return FX, FY, CX, CY, BalloonSize
 
 class BalloonDetectorNode(Node):

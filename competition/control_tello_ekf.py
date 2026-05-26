@@ -47,9 +47,9 @@ class ControlTelloEKF(Node):
         self.KP_XY = 0.6        # 水平移動增益
         self.KP_Z = 0.8         # 高度控制增益
         self.KP_YAW = 1.0       # 轉向對準增益
-        self.MAX_VEL = 0.5      # 限制自動模式最大速度 (m/s)
-        self.MAX_YAW_RATE = 0.6 # 限制最大旋轉角速度 (rad/s)
-        self.SEARCH_YAW_RATE = 0.4 # 自動找球時的原地自轉速度
+        self.MAX_VEL = 0.1      # 限制自動模式最大速度 (m/s)
+        self.MAX_YAW_RATE = 0.2 # 限制最大旋轉角速度 (rad/s)
+        self.SEARCH_YAW_RATE = 0.2 # 自動找球時的原地自轉速度
 
         # 控制指令變數
         self.v_x = 0.0
@@ -101,6 +101,10 @@ class ControlTelloEKF(Node):
         elif cmd == 'idle':
             self.state = 'IDLE'
             self.get_logger().info("🛑 [指令] 強制切換回 IDLE 原地停懸待命。")
+        
+        elif cmd == 'land':
+            self.send_tello_cmd('land')
+            self.get_logger().info("🚀 [指令] 收到降落...")
 
     def send_tello_cmd(self, cmd_string):
         """ 發送 Tello 控制動作（如 land） """
@@ -155,7 +159,7 @@ class ControlTelloEKF(Node):
             if self.takeoff_counter >= 80:
                 self.state = 'STEP1_SEARCH'
                 self.get_logger().info("🛫 Tello 已升空穩定！自動切換至 STEP1_SEARCH 開始找球。")
-                
+
         elif self.state == 'STEP1_SEARCH':
             if is_target_valid:
                 # 瞬間捕捉到氣球，切換至追蹤撞擊狀態
