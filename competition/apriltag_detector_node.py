@@ -84,11 +84,42 @@ class AprilTagDetectorNode(Node):
                                     camera_params=self.camera_params,
                                     tag_size=self.tag_size)
 
+        marker_array = MarkerArray()
+        for idx, tag in self.tag_pose_dict:
+            # AprilTag in World
+            pos = tag['position']
+            rpy = tag['orientation_rpy']
+            rot = R.from_euler('xyz', rpy).as_matrix()
+            T = np.eye(4)
+            T[:3, :3] = rot
+            T[:3, 3] = pos
+
+            marker = Marker()
+            marker.header.frame_id = 'map'
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.id = int(idx)
+            marker.type = Marker.CUBE
+            marker.action = Marker.ADD
+            marker.pose.position.x = float(T_w_t[0, 3])
+            marker.pose.position.y = float(T_w_t[1, 3])
+            marker.pose.position.z = float(T_w_t[2, 3]) + 0.001
+            q_tag = R.from_matrix(T_w_t[:3, :3]).as_quat()
+            marker.pose.orientation.x = q_tag[0]
+            marker.pose.orientation.y = q_tag[1]
+            marker.pose.orientation.z = q_tag[2]
+            marker.pose.orientation.w = q_tag[3]
+            marker.scale.x = float(self.tag_size)
+            marker.scale.y = float(self.tag_size)
+            marker.scale.z = 0.01
+            marker.color.a = 1.0
+            marker.color.r = 0.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+            marker_array.markers.append(marker)
+
         pose_array = PoseArray()
         pose_array.header.frame_id = 'map'
         pose_array.header.stamp = self.get_clock().now().to_msg()
-        marker_array = MarkerArray()
-
         for idx, tag in enumerate(tags):
             # T_c_t (T_camera_tag)
             T_c_t = np.eye(4)
@@ -122,31 +153,6 @@ class AprilTagDetectorNode(Node):
             pose.orientation.z = q[2]
             pose.orientation.w = q[3]
             pose_array.poses.append(pose)
-
-
-            # AprilTag in World
-            marker = Marker()
-            marker.header.frame_id = 'map'
-            marker.header.stamp = self.get_clock().now().to_msg()
-            marker.id = int(tag.tag_id)
-            marker.type = Marker.CUBE
-            marker.action = Marker.ADD
-            marker.pose.position.x = float(T_w_t[0, 3])
-            marker.pose.position.y = float(T_w_t[1, 3])
-            marker.pose.position.z = float(T_w_t[2, 3]) + 0.001
-            q_tag = R.from_matrix(T_w_t[:3, :3]).as_quat()
-            marker.pose.orientation.x = q_tag[0]
-            marker.pose.orientation.y = q_tag[1]
-            marker.pose.orientation.z = q_tag[2]
-            marker.pose.orientation.w = q_tag[3]
-            marker.scale.x = self.tag_size
-            marker.scale.y = self.tag_size
-            marker.scale.z = 0.01
-            marker.color.a = 1.0
-            marker.color.r = 0.0
-            marker.color.g = 1.0
-            marker.color.b = 0.0
-            marker_array.markers.append(marker)
 
         if len(pose_array.poses) > 0:
             self.pose_pub.publish(pose_array)
