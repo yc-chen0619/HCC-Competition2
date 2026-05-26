@@ -11,3 +11,24 @@ tags:
   - id: 3
     position: [1.130, -3.84, 1.305]
     orientation_rpy: [-1.5708, 0.0, 3.1416]
+
+
+# in EE632
+  - id: 4
+    position: [5.54, 0.0, 1.0]
+    orientation_rpy: [-1.5708, 0.0, -1.5708] 
+  - id: 5
+    position: [5.54, 0.0, 2.0]
+    orientation_rpy: [-1.5708, 0.0, -1.5708] 
+  - id: 6
+    position: [5.54, -2.0, 1.0]
+    orientation_rpy: [-1.5708, 0.0, -1.5708] 
+  - id: 7
+    position: [5.54, -2.0, 2.0]
+    orientation_rpy: [-1.5708, 0.0, -1.5708] 
+  - id: 8
+    position: [5.54, 2.0, 1.0]
+    orientation_rpy: [-1.5708, 0.0, -1.5708] 
+  - id: 9
+    position: [5.54, 2.0, 2.0]
+    orientation_rpy: [-1.5708, 0.0, -1.5708] 
