@@ -49,7 +49,7 @@ class ControlTelloEKF(Node):
         self.KP_YAW = 1.0       # 轉向對準增益
         self.MAX_VEL = 0.1      # 限制自動模式最大速度 (m/s)
         self.MAX_YAW_RATE = 0.2 # 限制最大旋轉角速度 (rad/s)
-        self.SEARCH_YAW_RATE = 0.2 # 自動找球時的原地自轉速度
+        self.SEARCH_YAW_RATE = 0.3 # 自動找球時的原地自轉速度
 
         # 控制指令變數
         self.v_x = 0.0

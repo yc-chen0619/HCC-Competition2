@@ -40,6 +40,7 @@ class EKFLocalizationNode(Node):
         self.dt = 0.1
         self.last_time = self.get_clock().now()
         self.timer = self.create_timer(0.1, self.predict_timer)
+        self.is_initialized = False
 
         # intial tello control
         self.last_flight_time = None
@@ -175,6 +176,24 @@ class EKFLocalizationNode(Node):
             [euler[2]],
             [euler[1]]
         ])
+
+        if self.is_initialized is not True:
+            self.get_logger().info("EKF Initialized with first AprilTag observation!")
+            self.is_initialized = True
+            self.update(z)
+            return
+
+        pred_x = self.mu[0, 0]
+        pred_y = self.mu[1, 0]
+        pred_z = self.mu[2, 0]
+        obs_x = z[0, 0]
+        obs_y = z[1, 0]
+        obs_z = z[2, 0]
+        
+        distance = np.sqrt((obs_x - pred_x)**2 + (obs_y - pred_y)**2 + (obs_z - pred_z)**2)
+        if distance > 0.175:
+            self.get_logger().warn(f"Outlier rejected! Jump distance: {distance:.2f}m")
+            return
         self.update(z)
 
     def publish_pose(self):
