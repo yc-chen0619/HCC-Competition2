@@ -42,6 +42,11 @@ class EKFLocalizationNode(Node):
         self.timer = self.create_timer(0.1, self.predict_timer)
         self.is_initialized = False
 
+        # Initial observation settings
+        self.observation_initial_count = 0
+        self.is_initialized = False
+        self.reject_count = 0
+
         # intial tello control
         self.last_flight_time = None
         self.last_roll = 0.0
@@ -50,6 +55,7 @@ class EKFLocalizationNode(Node):
 
     # state : [x, y, z, roll, yaw, pitch]
     # control : [v_x, v_y, v_z, roll_rate, yaw_rate, pitch_rate]
+    # observation : [x, y, z, roll, yaw, pitch]
     def motion_model(self, x, u):
         dt = self.dt
 
@@ -93,18 +99,18 @@ class EKFLocalizationNode(Node):
         self.Sigma = F @ self.Sigma @ F.T + self.Rm
 
     def update(self, z):
-        H = np.eye(6)
-        z_pred = self.mu
-        y = z - z_pred
+        C = np.eye(6)
+        I = np.eye(6)
+
+        y = z - self.mu
         y[3,0] = (y[3,0] + np.pi) % (2 * np.pi) - np.pi
         y[4,0] = (y[4,0] + np.pi) % (2 * np.pi) - np.pi
         y[5,0] = (y[5,0] + np.pi) % (2 * np.pi) - np.pi
 
-        S = H @ self.Sigma @ H.T + self.Q
-        K = self.Sigma @ H.T @ np.linalg.inv(S)
+        S = C @ self.Sigma @ C.T + self.Q
+        K = self.Sigma @ C.T @ np.linalg.inv(S)
         self.mu = self.mu + K @ y
-        I = np.eye(6)
-        self.Sigma = (I - K @ H) @ self.Sigma
+        self.Sigma = (I - K @ C) @ self.Sigma
 
     def predict_timer(self):
         now = self.get_clock().now()
@@ -117,14 +123,6 @@ class EKFLocalizationNode(Node):
             self.predict(self.u)
         self.publish_pose()
 
-    def cmd_callback(self, msg):
-        self.u[0, 0] = msg.linear.x    # vx
-        self.u[1, 0] = msg.linear.y    # vy
-        self.u[2, 0] = msg.linear.z    # vz
-        self.u[3, 0] = msg.angular.x   # roll_rate
-        self.u[4, 0] = msg.angular.z   # yaw_rate
-        self.u[5, 0] = msg.angular.y   # pitch_rate
-    
     def flight_data_callback(self, msg):
         # (cm/s) -> (m/s)、FRD frame -> FLU frame
         vx = msg.vgx / 100.0
@@ -177,9 +175,11 @@ class EKFLocalizationNode(Node):
             [euler[1]]
         ])
 
+        if self.observation_initial_count > 5:
+            self.is_initialized = True
         if self.is_initialized is not True:
             self.get_logger().info("EKF Initialized with first AprilTag observation!")
-            self.is_initialized = True
+            self.observation_initial_count += 1
             self.update(z)
             return
 
@@ -191,9 +191,20 @@ class EKFLocalizationNode(Node):
         obs_z = z[2, 0]
         
         distance = np.sqrt((obs_x - pred_x)**2 + (obs_y - pred_y)**2 + (obs_z - pred_z)**2)
-        if distance > 0.175:
-            self.get_logger().warn(f"Outlier rejected! Jump distance: {distance:.2f}m")
+        if distance > 0.875: # 0.175*5
+            self.reject_count += 1
+            self.get_logger().warn(f"Outlier rejected! Jump distance: {distance:.2f}m. Consecutive rejects: {self.reject_count}")
+            
+            if self.reject_count > 3:
+                self.get_logger().error("EKF is completely lost! Forcing reset to current visual observation.")
+                self.mu[0:3, 0] = z[0:3, 0] 
+                self.Sigma = np.eye(6) * 0.5 
+                
+                self.reject_count = 0
+                self.update(z)
             return
+        
+        self.reject_count = 0
         self.update(z)
 
     def publish_pose(self):
